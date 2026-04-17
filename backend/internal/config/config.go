@@ -19,7 +19,10 @@ type DatabaseConfig struct {
 }
 
 type AppConfig struct {
-	Port string //HTPP server port
+	Port                 string //HTPP server port
+	DefaultAdminEmail    string //Default email for the initial admin user created at startup
+	DefaultAdminPassword string //Default password for the initial admin user created at startup
+	ExecuteSeed          bool   //Flag to determine if the database seeding should be executed at startup
 }
 
 type AuthConfig struct {
@@ -58,6 +61,20 @@ func LoadConfig() *Config {
 
 	var err error
 	config.APP.Port, err = requiredEnv("APP_PORT", &errors)
+
+	config.APP.DefaultAdminEmail, err = requiredEnv("DEFAULT_ADMIN_EMAIL", &errors)
+
+	config.APP.DefaultAdminPassword, err = requiredEnv("DEFAULT_ADMIN_PASSWORD", &errors)
+
+	executeSeedStr, err := requiredEnv("EXECUTE_SEED", &errors)
+
+	executeSeed, err := strconv.ParseBool(executeSeedStr)
+
+	if err != nil {
+		errors = append(errors, "Environment variable EXECUTE_SEED must be a valid boolean (true/false)")
+	}
+
+	config.APP.ExecuteSeed = executeSeed
 
 	// Auth
 	config.Auth.JwtSecret, err = requiredEnv("JWT_SECRET", &errors)
