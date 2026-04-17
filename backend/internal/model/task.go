@@ -1,5 +1,7 @@
 package model
 
+import "time"
+
 type TaskState string
 
 const (
@@ -15,9 +17,9 @@ type Task struct {
 	ID          string    `db:"id" json:"id"`
 	Title       string    `db:"title" json:"title"`
 	Description string    `db:"description" json:"description"`
-	ExpiresAt   string    `db:"expires_at" json:"expires_at"`
-	CreatedAt   string    `db:"created_at" json:"created_at"`
-	UpdatedAt   string    `db:"updated_at" json:"updated_at"`
+	ExpiresAt   time.Time `db:"expires_at" json:"expires_at"`
+	CreatedAt   time.Time `db:"created_at" json:"created_at"`
+	UpdatedAt   time.Time `db:"updated_at" json:"updated_at"`
 	CreatedBy   string    `db:"created_by" json:"created_by"`
 	AssignedTo  string    `db:"assigned_to" json:"assigned_to"`
 	TaskState   TaskState `db:"task_state" json:"task_state"`

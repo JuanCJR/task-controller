@@ -18,26 +18,38 @@ func NewAuthService(userRepo *repository.UserRepository, cfg config.AuthConfig) 
 	return &AuthService{userRepo: userRepo, cfg: cfg}
 }
 
-func (s *AuthService) Login(ctx context.Context, email, password string) (string, error) {
+type LoginResponse struct {
+	Token              string `json:"token"`
+	MustChangePassword bool   `json:"must_change_password"`
+	UserID             string `json:"user_id"`
+	Email              string `json:"email"`
+	FirstName          string `json:"first_name"`
+	LastName           string `json:"last_name"`
+}
+
+func (s *AuthService) Login(ctx context.Context, email, password string) (*LoginResponse, error) {
 	user, err := s.userRepo.GetByEmail(ctx, email)
-
 	if err != nil {
-		return "", err
+		return nil, fmt.Errorf("invalid credentials")
 	}
 
-	hasValidCredentials := utils.CheckPasswordHash(password, user.Password)
-
-	if !hasValidCredentials {
-		return "", fmt.Errorf("invalid credentials")
+	if !utils.CheckPasswordHash(password, user.Password) {
+		return nil, fmt.Errorf("invalid credentials")
 	}
 
-	// Generar token JWT
 	token, err := utils.GenerateToken(user.ID, s.cfg.JwtSecret, s.cfg.TokenExpiration)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return token, nil
+	return &LoginResponse{
+		Token:              token,
+		MustChangePassword: user.MustChangePassword,
+		UserID:             user.ID,
+		Email:              user.Email,
+		FirstName:          user.FirstName,
+		LastName:           user.LastName,
+	}, nil
 }
 
 func (s *AuthService) ChangePassword(ctx context.Context, userId, oldPassword, newPassword string) error {

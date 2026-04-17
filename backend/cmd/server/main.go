@@ -42,8 +42,10 @@ func main() {
 
 	//Repository Creation
 	userRepo := repository.NewUserRepository(db)
-	permissionRepo :=
-		repository.NewPermissionRepository(db)
+	permissionRepo := repository.NewPermissionRepository(db)
+	roleRepo := repository.NewRoleRepository(db)
+	taskRepo := repository.NewTaskRepository(db)
+	taskCommentRepo := repository.NewTaskCommentRepository(db)
 
 	//Middleware Creation
 	authMw := middleware.AuthMiddleware(cfg.Auth.JwtSecret)
@@ -52,16 +54,22 @@ func main() {
 	}
 
 	//Service Creation
-	userService := service.NewUserService(userRepo)
+	userService := service.NewUserService(userRepo, roleRepo)
 	authService := service.NewAuthService(userRepo, cfg.Auth)
+	taskService := service.NewTaskService(taskRepo, roleRepo)
+	taskCommentService := service.NewTaskCommentService(taskCommentRepo, taskRepo, roleRepo)
 
 	//Handler Creation
 	userHandler := handler.NewUserHandler(userService, authMw, rbacMw)
 	authHandler := handler.NewAuthHandler(authService, authMw)
+	taskHandler := handler.NewTaskHandler(taskService, roleRepo, authMw, rbacMw)
+	taskCommentHandler := handler.NewTaskCommentHandler(taskCommentService, authMw, rbacMw)
 
 	handlers := []handler.RouteRegister{
 		userHandler,
 		authHandler,
+		taskHandler,
+		taskCommentHandler,
 	}
 
 	//Init server

@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/JuanCJR/task-controller/internal/dto"
@@ -38,7 +37,7 @@ func (h *AuthHandler) RegisterRoutes(api *gin.RouterGroup) {
 // @Accept       json
 // @Produce      json
 // @Param        body body dto.LoginRequest true "Login credentials"
-// @Success      200  {object} map[string]string
+// @Success      200  {object} service.LoginResponse
 // @Failure      400  {object} map[string]string
 // @Failure      401  {object} map[string]string
 // @Router       /auth/login [post]
@@ -55,7 +54,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"token": token})
+	c.JSON(http.StatusOK, token)
 
 }
 
@@ -85,9 +84,6 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 // @Router       /auth/change-password [put]
 func (h *AuthHandler) ChangePassword(c *gin.Context) {
 	userID, exists := c.Get("userID")
-	fmt.Println("oliiiii")
-
-	fmt.Println("userID", userID)
 
 	if !exists {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
