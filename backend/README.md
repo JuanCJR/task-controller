@@ -165,18 +165,160 @@ Cliente HTTP
 ### Auditor
 - Solo puede ver todas las tareas (lectura)
 
-### Transiciones de estado permitidas
-
-```
-Asignado → Iniciado
-Iniciado → En espera | Finalizada con exito | Finalizada con error
-En espera → Iniciado | Finalizada con exito | Finalizada con error
-```
-
 ### General
 - Todo usuario nuevo inicia con `must_change_password = true`
 - El middleware RBAC bloquea el acceso a recursos si el usuario debe cambiar su contraseña
 - El login devuelve el flag `must_change_password` para que el frontend redirija al cambio
+
+## Diagramas
+
+### Modelo RBAC - Permisos por rol
+
+```mermaid
+graph LR
+    subgraph Roles
+        Admin
+        Ejecutor
+        Auditor
+    end
+
+    subgraph "Permisos User"
+        CU[create:user]
+        RU[read:user]
+        UU[update:user]
+        DU[delete:user]
+    end
+
+    subgraph "Permisos Task"
+        CT[create:task]
+        RT[read:task]
+        UT[update:task]
+        DT[delete:task]
+    end
+
+    subgraph "Permisos Role"
+        CR[create:role]
+        RR[read:role]
+        UR[update:role]
+        DR[delete:role]
+    end
+
+    Admin --> CU & RU & UU & DU
+    Admin --> CT & RT & UT & DT
+    Admin --> CR & RR & UR & DR
+
+    Ejecutor --> RT & UT
+
+    Auditor --> RT
+```
+
+### Transiciones de estado de tareas
+
+```mermaid
+stateDiagram-v2
+    [*] --> Asignado : Admin crea tarea
+
+    Asignado --> Iniciado : Ejecutor inicia
+
+    Iniciado --> EnEspera : Ejecutor pausa
+    Iniciado --> FinalizadaExito : Ejecutor completa
+    Iniciado --> FinalizadaError : Ejecutor reporta error
+
+    EnEspera --> Iniciado : Ejecutor retoma
+    EnEspera --> FinalizadaExito : Ejecutor completa
+    EnEspera --> FinalizadaError : Ejecutor reporta error
+
+    FinalizadaExito --> [*]
+    FinalizadaError --> [*]
+
+    state "En espera" as EnEspera
+    state "Finalizada con exito" as FinalizadaExito
+    state "Finalizada con error" as FinalizadaError
+```
+
+### Flujo de creacion de tarea (Admin)
+
+```mermaid
+flowchart TD
+    A[Admin envia POST /tasks] --> B{assigned_to tiene rol Ejecutor?}
+    B -- No --> C[400: tasks can only be assigned to Ejecutor]
+    B -- Si --> D[Crear tarea con estado Asignado]
+    D --> E[201: tarea creada]
+```
+
+### Flujo de actualizacion de estado (Ejecutor)
+
+```mermaid
+flowchart TD
+    A[Ejecutor envia PATCH /tasks/:id/state] --> B{Tarea asignada a este usuario?}
+    B -- No --> C[400: solo puedes actualizar tus tareas]
+    B -- Si --> D{Tarea vencida?}
+    D -- Si --> E[400: no se puede actualizar tarea vencida]
+    D -- No --> F{Transicion de estado valida?}
+    F -- No --> G[400: transicion no permitida]
+    F -- Si --> H[Actualizar estado]
+    H --> I[200: estado actualizado]
+```
+
+### Flujo de comentarios en tareas (Ejecutor)
+
+```mermaid
+flowchart TD
+    A[Ejecutor envia POST /tasks/:id/comments] --> B{Tarea asignada a este usuario?}
+    B -- No --> C[400: solo puedes comentar tus tareas]
+    B -- Si --> D{Tarea tiene fecha de expiracion?}
+    D -- No --> E[400: tarea sin fecha de expiracion]
+    D -- Si --> F{Tarea vencida?}
+    F -- No --> G[400: solo puede comentar tareas vencidas]
+    F -- Si --> H[Crear comentario]
+    H --> I[201: comentario creado]
+```
+
+### Flujo de creacion de usuario (Admin)
+
+```mermaid
+flowchart TD
+    A[Admin envia POST /users] --> B{Rol solicitado es Admin?}
+    B -- Si --> C[400: no se puede crear usuarios Admin]
+    B -- No --> D{Rol existe?}
+    D -- No --> E[400: rol no encontrado]
+    D -- Si --> F[Crear usuario + asignar rol en transaccion]
+    F --> G[must_change_password = true]
+    G --> H[201: usuario creado]
+```
+
+### Flujo de autenticacion y acceso a recursos
+
+```mermaid
+sequenceDiagram
+    actor U as Usuario
+    participant H as Handler
+    participant Auth as Auth Middleware
+    participant RBAC as RBAC Middleware
+    participant S as Service
+    participant DB as PostgreSQL
+
+    U->>H: Request con Bearer token
+    H->>Auth: Validar JWT
+    alt Token invalido
+        Auth-->>U: 401 Unauthorized
+    end
+    Auth->>RBAC: userID en contexto
+    RBAC->>DB: must_change_password?
+    alt Debe cambiar password
+        RBAC-->>U: 403 password change required
+    end
+    RBAC->>DB: Tiene permiso action:module?
+    alt Sin permiso
+        RBAC-->>U: 403 insufficient permissions
+    end
+    RBAC->>H: Continuar
+    H->>S: Ejecutar logica de negocio
+    S->>DB: Query
+    DB-->>S: Resultado
+    S-->>H: Respuesta
+    H-->>U: JSON response
+```
 
 ## Variables de entorno
 
